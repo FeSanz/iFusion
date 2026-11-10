@@ -79,6 +79,59 @@ namespace iFusion.Models
                 Uri.EscapeDataString(string.Join(AndV4, q)).Replace("%27", "'").Replace("%3D", "=");
         }
 
+        // Datos maestros del artículo para la sección de Inventarios (nombres de campo tomados de la respuesta real de itemsV2).
+        public const string ItemDetailFields =
+            "ItemId,OrganizationCode,ItemClass,ItemNumber,ItemDescription,LongDescription,UserItemTypeValue,ItemStatusValue,ApprovalStatusValue,LifecyclePhaseValue,PrimaryUOMValue," +
+            "ReservableFlag,StockEnabledFlag,MaterialTransactionEnabledFlag,CostingEnabledFlag,LotControlValue,StartingLotPrefix,StartingLotNumber,LotExpirationControlValue,ShelfLifeDays," +
+            "SerialGenerationValue,SerialStartingPrefix,SerialStartingNumber,CycleCountEnabledFlag,StockLocatorControlValue,RestrictSubinventoriesFlag,RestrictLocatorsFlag," +
+            "PlanningMakeBuyValue,Planner,ShippableFlag,PurchasableFlag,CreationDate,LastUpdateDate," +
+            "UnitWeightQuantity,WeightUOMValue,UnitVolumeQuantity,VolumeUOMValue,UnitLengthQuantity,UnitWidthQuantity,UnitHeightQuantity,DimensionUOMValue," +
+            "ContainerItemFlag,ContainerTypeValue,MaximumLoadWeight,InternalVolume,MinimumFillPercent,PackagingStringValue,PackTypeValue,VehicleItemFlag,WarehouseEquipmentFlag," +
+            "ExpirationDateCalculationBasisValue,ExpirationActionValue,ExpirationActionInterval,MaturityDays,HoldDays,RetestInterval,GradeControlFlag,DefaultGradeValue,LotStatusEnabledFlag,DefaultLotStatusValue," +
+            "LotDivisibleFlag,LotSplitEnabledFlag,LotMergeEnabledFlag,LotTranslateEnabledFlag,ChildLotEnabledFlag,RevisionQuantityControlFlag,SerialStatusEnabledFlag,PickingRuleValue,BulkPickedFlag," +
+            "CheckMaterialShortageFlag,ShrinkageRate,MinimumOrderQuantity,MaximumOrderQuantity,FixedLotSizeMultiplier";
+
+        public static string ItemDetailPath(string orgCode, string item)
+        {
+            return "/itemsV2?limit=1&onlyData=true&fields=" + ItemDetailFields + "&q=" +
+                Uri.EscapeDataString("ItemNumber='" + item.Replace("'", "''") + "'" + AndV4 + "OrganizationCode='" + orgCode.Replace("'", "''") + "'").Replace("%27", "'").Replace("%3D", "=");
+        }
+
+        // Búsqueda de artículo por prefijo en todas las organizaciones (una fila por organización que lo tiene)
+        public static string ItemSearchAllOrgsPath(string prefix)
+        {
+            return "/itemsV2?limit=500&onlyData=true&fields=ItemNumber,ItemDescription,OrganizationCode,OrganizationId&q=" +
+                Uri.EscapeDataString("ItemNumber like '" + prefix.Replace("'", "''") + "%'").Replace("%27", "'").Replace("%3D", "=");
+        }
+
+        // Lotes del artículo con fecha de origen (FIFO) y de caducidad (FEFO)
+        public static string ItemLotsInfoPath(string orgCode, string item)
+        {
+            return "/inventoryItemLots?limit=500&onlyData=true&fields=LotNumber,StatusCode,Grade,OriginationDate,ExpirationDate,MaturityDate,HoldUntilDate,RetestDate,ActiveLot&q=" +
+                Uri.EscapeDataString("ItemNumber='" + item.Replace("'", "''") + "'" + AndV4 + "OrganizationCode='" + orgCode.Replace("'", "''") + "'").Replace("%27", "'").Replace("%3D", "=");
+        }
+
+        // Conteos cíclicos: cabeceras (definiciones) y secuencias de conteo. Las secuencias exigen nombre del conteo y organización.
+        public const string CycleCountDefinitionsPath = "/cycleCountDefinitions?limit=500&onlyData=true";
+
+        private const string CycleSeqFields =
+            "CycleCountEntryId,CycleCountHeaderId,CycleCountName,OrganizationId,OrganizationCode,CountSequence,CountSequenceWithPrefix,InventoryItemId,ItemNumber,ItemDescription," +
+            "Subinventory,Locator,LocatorId,LotNumber,SerialNumber,Revision,CountQuantity,CountUOM,CountUOMCode,PrimarySuggestedQuantity,PrimaryAdjustmentQuantity," +
+            "CountSequenceStatus,CountSequenceStatusCode,CountType,CountDate,CountDueDate,CountedBy,Reason,Comments";
+
+        public static string CycleSequencesPath(string countName, string orgCode, bool withFields)
+        {
+            return "/cycleCountSequenceDetails?limit=500" + (withFields ? "&fields=" + CycleSeqFields : string.Empty) + "&q=" +
+                Uri.EscapeDataString("CycleCountName='" + countName.Replace("'", "''") + "'" + AndV4 + "OrganizationCode='" + orgCode.Replace("'", "''") + "'").Replace("%27", "'").Replace("%3D", "=");
+        }
+
+        // Existencia con cantidad reservada por subinventario / localizador / lote (varios niveles de resumen en la misma lista)
+        public static string OnhandDetailsPath(string orgCode, string item)
+        {
+            return "/onhandQuantityDetails?limit=500&onlyData=true&q=" +
+                Uri.EscapeDataString("ItemNumber='" + item.Replace("'", "''") + "'" + AndV4 + "OrganizationCode='" + orgCode.Replace("'", "''") + "'").Replace("%27", "'").Replace("%3D", "=");
+        }
+
         // Definiciones de trabajo del artículo en la organización (ORA_MAIN, etc.)
         public static string WorkDefinitionsPath(string orgCode, string item)
         {

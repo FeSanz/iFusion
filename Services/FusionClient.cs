@@ -57,7 +57,15 @@ namespace iFusion.Services
                     if (!res.IsSuccessStatusCode)
                     {
                         string detail = body;
-                        try { JObject o = JObject.Parse(body); detail = (string)o["detail"] ?? (string)o["title"] ?? body; } catch (Exception) { }
+                        try
+                        {
+                            JObject o = JObject.Parse(body);
+                            detail = (string)o["detail"] ?? (string)o["title"] ?? body;
+                            // Oracle pone el motivo real en o:errorDetails; "Bad Request" solo no dice nada
+                            JArray more = o["o:errorDetails"] as JArray;
+                            if (more != null && more.Count > 0) detail = string.Join(" | ", more.Select(d => (string)d["detail"]).Where(d => !string.IsNullOrEmpty(d)));
+                        }
+                        catch (Exception) { }
                         if (detail.Length > 400) detail = detail.Substring(0, 400);
                         ConsoleLog.Log(LogKind.Error, "HTTP " + (int)res.StatusCode + " · " + clock.ElapsedMilliseconds + " ms", detail);
                         throw new FusionException("Oracle " + (int)res.StatusCode + ": " + detail);
@@ -90,11 +98,11 @@ namespace iFusion.Services
                 if (at >= 0) path = path.Substring(at + 7);
 
                 string mediaType = req.Content?.Headers.ContentType?.MediaType ?? string.Empty;
-                if (req.Method == HttpMethod.Post && req.Content != null && !mediaType.Contains("batch"))
+                if ((req.Method == HttpMethod.Post || req.Method.Method == "PATCH") && req.Content != null && !mediaType.Contains("batch"))
                 {
-                    // POST directo (un solo recurso): se anota la ruta y el contenido enviado
+                    // POST / PATCH directo (un solo recurso): se anota la ruta y el contenido enviado
                     writes = true;
-                    ConsoleLog.Log(LogKind.Tx, "POST " + path, await req.Content.ReadAsStringAsync());
+                    ConsoleLog.Log(LogKind.Tx, req.Method.Method + " " + path, await req.Content.ReadAsStringAsync());
                 }
                 else if (req.Method == HttpMethod.Post && req.Content != null)
                 {
@@ -155,6 +163,17 @@ namespace iFusion.Services
             {
                 req.Content = new StringContent(payload.ToString(Newtonsoft.Json.Formatting.None), Encoding.UTF8, "application/json");
                 return JObject.Parse(await SendAsync(req));
+            }
+        }
+
+        /// <summary>PATCH a un registro (JSON, framework 4); la ruta es relativa a /fscmRestApi/resources/latest.</summary>
+        public static async Task<JObject> PatchAsync(string path, JObject payload)
+        {
+            using (HttpRequestMessage req = Build(InstanceStore.Active, new HttpMethod("PATCH"), path))
+            {
+                req.Content = new StringContent(payload.ToString(Newtonsoft.Json.Formatting.None), Encoding.UTF8, "application/json");
+                string body = await SendAsync(req);
+                return body.Trim().Length == 0 ? new JObject() : JObject.Parse(body);
             }
         }
 

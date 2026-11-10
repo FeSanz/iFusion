@@ -10,3 +10,4 @@ C:\Users\Felipe\source\repos\iFusion\obj\Debug\net472\iFusion.csproj.CoreCompile
 C:\Users\Felipe\source\repos\iFusion\obj\Debug\net472\iFusion.csproj.Up2Date
 C:\Users\Felipe\source\repos\iFusion\obj\Debug\net472\iFusion.exe
 C:\Users\Felipe\source\repos\iFusion\obj\Debug\net472\iFusion.pdb
+C:\Users\Felipe\source\repos\iFusion\obj\Debug\net472\iFusion.sourcelink.json

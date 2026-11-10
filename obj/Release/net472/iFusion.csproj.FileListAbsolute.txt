@@ -10,3 +10,4 @@ C:\Users\Felipe\source\repos\iFusion\bin\Release\net472\Newtonsoft.Json.dll
 C:\Users\Felipe\source\repos\iFusion\obj\Release\net472\iFusion.csproj.Up2Date
 C:\Users\Felipe\source\repos\iFusion\obj\Release\net472\iFusion.exe
 C:\Users\Felipe\source\repos\iFusion\obj\Release\net472\iFusion.pdb
+C:\Users\Felipe\source\repos\iFusion\obj\Release\net472\iFusion.sourcelink.json

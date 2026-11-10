@@ -29,6 +29,13 @@ namespace iFusion.Views
         private readonly Button btnNewWo = UiKit.Btn("Nueva OT liberada", false, 160);
         private readonly Button btnConsole = UiKit.Btn("Consola ▲", false, 110);
         private Panel pnlConsole;
+        private CardPanel filters;
+        private Panel content;
+        private readonly InventoryView inventory = new InventoryView();
+        private readonly Button secMfg = UiKit.Btn("Manufactura", false, 130), secInv = UiKit.Btn("Inventarios", false, 130);
+        private bool inventorySection, countSub;
+        private readonly CycleCountView cycle = new CycleCountView();
+        private readonly Button subStock = UiKit.Btn("Existencias", false, 120), subCount = UiKit.Btn("Conteos cíclicos", false, 150);
         private readonly DataGridView gridWo = UiKit.Grid(false);
         private readonly FlowLayoutPanel detail = new FlowLayoutPanel { Dock = DockStyle.Fill, AutoScroll = true, FlowDirection = FlowDirection.TopDown, WrapContents = false, Padding = new Padding(0, 6, 0, 0) };
         private readonly Label lblStatus = UiKit.Lbl("Selecciona una instancia y realiza una búsqueda.", false, 9f, Ui.TextSecondary);
@@ -62,9 +69,18 @@ namespace iFusion.Views
             // Barra superior
             CardPanel top = new CardPanel { Dock = DockStyle.Top, Height = 52, Style = CardStyle.TopBar };
             Label brand = UiKit.Lbl("iFusion", true, 14f, Ui.Accent); brand.Location = new Point(16, 13);
-            Label brandSub = UiKit.Lbl("Órdenes de Trabajo · Oracle Fusion Cloud", false, 9f, Ui.TextSecondary); brandSub.Location = new Point(92, 19);
+            Label brandSub = UiKit.Lbl("Oracle Fusion Cloud", false, 9f, Ui.TextSecondary); brandSub.Location = new Point(92, 19);
             Label lblInst = UiKit.Lbl("Instancia activa", false, 9f, Ui.TextSecondary);
-            top.Controls.AddRange(new Control[] { brand, brandSub, lblInst, cmbInstance, btnInstances });
+            secMfg.Location = new Point(250, 11); secInv.Location = new Point(388, 11);
+            secMfg.Click += (s, e) => SetSection(false);
+            secInv.Click += async (s, e) => { SetSection(true); await EnterInventorySubAsync(); };
+            inventory.Status = text => lblStatus.Text = text;
+            cycle.Status = text => lblStatus.Text = text;
+            subStock.Location = new Point(560, 11); subCount.Location = new Point(688, 11);
+            subStock.Visible = subCount.Visible = false;
+            subStock.Click += async (s, e) => { countSub = false; SetSection(true); await EnterInventorySubAsync(); };
+            subCount.Click += async (s, e) => { countSub = true; SetSection(true); await EnterInventorySubAsync(); };
+            top.Controls.AddRange(new Control[] { brand, brandSub, secMfg, secInv, subStock, subCount, lblInst, cmbInstance, btnInstances });
             top.Resize += (s, e) =>
             {
                 btnInstances.Location = new Point(top.Width - btnInstances.Width - 16, 11);
@@ -89,7 +105,7 @@ namespace iFusion.Views
             };
 
             // Filtros
-            CardPanel filters = new CardPanel { Dock = DockStyle.Left, Width = 300, Margin = new Padding(0) };
+            filters = new CardPanel { Dock = DockStyle.Left, Width = 300, Margin = new Padding(0) };
             int y = 14;
             Action<string, Control, int> field = (cap, ctl, h) =>
             {
@@ -109,7 +125,7 @@ namespace iFusion.Views
             foreach (string[] s in Statuses) lstStatus.Add(s[1]);
 
             // Contenido
-            Panel content = new Panel { Dock = DockStyle.Fill, Padding = new Padding(12, 8, 12, 8) };
+            content = new Panel { Dock = DockStyle.Fill, Padding = new Padding(12, 8, 12, 8) };
             Panel tabs = new Panel { Dock = DockStyle.Top, Height = 40 };
             tabProcess.Location = new Point(0, 4); tabDiscrete.Location = new Point(210, 4);
             btnReceipt.Enabled = false;
@@ -128,6 +144,10 @@ namespace iFusion.Views
             content.Controls.Add(tabs);
 
             Controls.Add(content);
+            inventory.Visible = false;
+            cycle.Visible = false;
+            Controls.Add(inventory);
+            Controls.Add(cycle);
             Controls.Add(filters);
             Controls.Add(top);
             Controls.Add(pnlConsole);
@@ -148,8 +168,40 @@ namespace iFusion.Views
             detail.SizeChanged += (s, e) => ResizeWide();
         }
 
+        private string OrgCodeSelected() { Item o = cmbOrg.SelectedItem as Item; return o == null ? null : (string)o.Value; }
+
+        /// <summary>Alterna entre las secciones Manufactura (OT) e Inventarios.</summary>
+        private void SetSection(bool inventories)
+        {
+            inventorySection = inventories;
+            filters.Visible = content.Visible = !inventories;
+            inventory.Visible = inventories && !countSub;
+            cycle.Visible = inventories && countSub;
+            subStock.Visible = subCount.Visible = inventories;
+            MarkSections();
+            Text = inventories ? "iFusion · Inventarios" : "iFusion · Órdenes de Trabajo";
+        }
+
+        /// <summary>Carga lo que necesita la subsección activa de Inventarios (existencias o conteos cíclicos).</summary>
+        private async System.Threading.Tasks.Task EnterInventorySubAsync()
+        {
+            if (countSub) await cycle.EnsureLoadedAsync();
+            else await inventory.EnsureOrgsAsync(OrgCodeSelected());
+        }
+
+        private void MarkSections()
+        {
+            UiKit.Style(secMfg, !inventorySection);
+            UiKit.Style(secInv, inventorySection);
+            UiKit.Style(subStock, inventorySection && !countSub);
+            UiKit.Style(subCount, inventorySection && countSub);
+            secMfg.Font = new Font(inventorySection ? Ui.FontFamily : Ui.FontFamilySemibold, 9f);
+            secInv.Font = new Font(inventorySection ? Ui.FontFamilySemibold : Ui.FontFamily, 9f);
+        }
+
         private void MarkTabs()
         {
+            MarkSections();
             tabProcess.Text = "Manufactura por procesos";
             tabDiscrete.Text = "Manufactura discreta";
             UiKit.Style(tabProcess, process);
@@ -185,7 +237,10 @@ namespace iFusion.Views
             Instance sel = cmbInstance.SelectedItem as Instance;
             if (sel != null) InstanceStore.Active = sel;
             ClearResults();
+            inventory.Reset();
+            cycle.Reset();
             await LoadOrganizationsAsync();
+            if (inventorySection) await EnterInventorySubAsync();
         }
 
         private async System.Threading.Tasks.Task LoadOrganizationsAsync()

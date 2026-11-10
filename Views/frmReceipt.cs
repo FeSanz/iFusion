@@ -89,7 +89,9 @@ namespace iFusion.Views
 
             Label head = UiKit.Lbl(UiKit.S(mat, "ItemNumber") + "  ·  " + UiKit.S(mat, "ItemDescription"), true, 10f);
             head.Location = new Point(14, 10);
-            Label sub = UiKit.Lbl("OT " + UiKit.S(wo, "WorkOrderNumber") + (lot ? "   ·   CON LOTE" : "   ·   sin lote"), false, 8.5f, lot ? Ui.Warning : Ui.TextSecondary);
+            // Desde Inventarios no hay OT: wo trae Inventory = true
+            string origin = UiKit.S(wo, "Inventory") == "True" ? "Inventarios" : "OT " + UiKit.S(wo, "WorkOrderNumber");
+            Label sub = UiKit.Lbl(origin + (lot ? "   ·   CON LOTE" : "   ·   sin lote"), false, 8.5f, lot ? Ui.Warning : Ui.TextSecondary);
             sub.Location = new Point(14, 30);
 
             ln.Qty = new TextBox { Width = 100 };
@@ -125,11 +127,16 @@ namespace iFusion.Views
                 Line captured = ln;
                 // Lote automático LOT + epoch (segundos); editable. Cada fila nueva toma uno distinto.
                 ln.Lots.DefaultValuesNeeded += (s, e) => e.Row.Cells[0].Value = NextLotName(captured);
-                ln.Lots.Rows.Add(NextLotName(ln), null);
+                // Si se pidió un lote existente (desde Inventarios) se usa ese; si no, uno nuevo LOT + epoch
+                string prefillLot = UiKit.S(mat, "PrefillLot");
+                ln.Lots.Rows.Add(prefillLot.Length > 0 ? prefillLot : NextLotName(ln), null);
                 ln.Lots.CellEndEdit += (s, e) => SumLots(captured);
                 ln.Lots.RowsRemoved += (s, e) => SumLots(captured);
                 card.Controls.Add(l); card.Controls.Add(ln.Lots);
             }
+            // Localizador elegido de forma explícita por el usuario en la fila de Inventarios
+            string prefillLoc = UiKit.S(mat, "PrefillLocator");
+            if (prefillLoc.Length > 0) ln.Loc.Text = prefillLoc;
             card.Controls.Add(head); card.Controls.Add(sub);
             lines.Add(ln);
             return card;

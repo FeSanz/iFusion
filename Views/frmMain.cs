@@ -33,7 +33,9 @@ namespace iFusion.Views
         private Panel content;
         private readonly InventoryView inventory = new InventoryView();
         private readonly Button secMfg = UiKit.Btn("Manufactura", false, 130), secInv = UiKit.Btn("Inventarios", false, 130);
-        private bool inventorySection, countSub;
+        private bool inventorySection, countSub, rmaSub;
+        private readonly RmaView rma = new RmaView();
+        private readonly Button subRma = UiKit.Btn("Devoluciones (RMA)", false, 180);
         private readonly CycleCountView cycle = new CycleCountView();
         private readonly Button subStock = UiKit.Btn("Existencias", false, 120), subCount = UiKit.Btn("Conteos cíclicos", false, 150);
         private readonly DataGridView gridWo = UiKit.Grid(false);
@@ -76,11 +78,14 @@ namespace iFusion.Views
             secInv.Click += async (s, e) => { SetSection(true); await EnterInventorySubAsync(); };
             inventory.Status = text => lblStatus.Text = text;
             cycle.Status = text => lblStatus.Text = text;
+            rma.Status = text => lblStatus.Text = text;
+            subRma.Location = new Point(846, 11); subRma.Visible = false;
+            subRma.Click += async (s, e) => { countSub = false; rmaSub = true; SetSection(true); await EnterInventorySubAsync(); };
             subStock.Location = new Point(560, 11); subCount.Location = new Point(688, 11);
             subStock.Visible = subCount.Visible = false;
-            subStock.Click += async (s, e) => { countSub = false; SetSection(true); await EnterInventorySubAsync(); };
-            subCount.Click += async (s, e) => { countSub = true; SetSection(true); await EnterInventorySubAsync(); };
-            top.Controls.AddRange(new Control[] { brand, brandSub, secMfg, secInv, subStock, subCount, lblInst, cmbInstance, btnInstances });
+            subStock.Click += async (s, e) => { countSub = false; rmaSub = false; SetSection(true); await EnterInventorySubAsync(); };
+            subCount.Click += async (s, e) => { countSub = true; rmaSub = false; SetSection(true); await EnterInventorySubAsync(); };
+            top.Controls.AddRange(new Control[] { brand, brandSub, secMfg, secInv, subStock, subCount, subRma, lblInst, cmbInstance, btnInstances });
             top.Resize += (s, e) =>
             {
                 btnInstances.Location = new Point(top.Width - btnInstances.Width - 16, 11);
@@ -146,6 +151,8 @@ namespace iFusion.Views
             Controls.Add(content);
             inventory.Visible = false;
             cycle.Visible = false;
+            rma.Visible = false;
+            Controls.Add(rma);
             Controls.Add(inventory);
             Controls.Add(cycle);
             Controls.Add(filters);
@@ -175,8 +182,10 @@ namespace iFusion.Views
         {
             inventorySection = inventories;
             filters.Visible = content.Visible = !inventories;
-            inventory.Visible = inventories && !countSub;
+            inventory.Visible = inventories && !countSub && !rmaSub;
             cycle.Visible = inventories && countSub;
+            rma.Visible = inventories && rmaSub;
+            subRma.Visible = inventories;
             subStock.Visible = subCount.Visible = inventories;
             MarkSections();
             Text = inventories ? "iFusion · Inventarios" : "iFusion · Órdenes de Trabajo";
@@ -185,6 +194,7 @@ namespace iFusion.Views
         /// <summary>Carga lo que necesita la subsección activa de Inventarios (existencias o conteos cíclicos).</summary>
         private async System.Threading.Tasks.Task EnterInventorySubAsync()
         {
+            if (rmaSub) return;
             if (countSub) await cycle.EnsureLoadedAsync();
             else await inventory.EnsureOrgsAsync(OrgCodeSelected());
         }
@@ -193,8 +203,9 @@ namespace iFusion.Views
         {
             UiKit.Style(secMfg, !inventorySection);
             UiKit.Style(secInv, inventorySection);
-            UiKit.Style(subStock, inventorySection && !countSub);
-            UiKit.Style(subCount, inventorySection && countSub);
+            UiKit.Style(subStock, inventorySection && !countSub && !rmaSub);
+            UiKit.Style(subRma, inventorySection && rmaSub);
+            UiKit.Style(subCount, inventorySection && countSub && !rmaSub);
             secMfg.Font = new Font(inventorySection ? Ui.FontFamily : Ui.FontFamilySemibold, 9f);
             secInv.Font = new Font(inventorySection ? Ui.FontFamilySemibold : Ui.FontFamily, 9f);
         }
@@ -239,6 +250,7 @@ namespace iFusion.Views
             ClearResults();
             inventory.Reset();
             cycle.Reset();
+            rma.Reset();
             await LoadOrganizationsAsync();
             if (inventorySection) await EnterInventorySubAsync();
         }

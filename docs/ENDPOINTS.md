@@ -319,6 +319,18 @@ Response (**real**, abreviado):
 Orden de consumo que calcula la app: **FIFO** = `OriginationDate` ascendente · **LIFO** = inverso de FIFO · **FEFO** = `ExpirationDate` ascendente.
 Las fechas vienen a medianoche UTC (`…T00:00:00+00:00`) y se muestran en UTC.
 
+**Comparativa de vida útil** (tabla de lotes):
+
+| Dato | Origen en el response | Cálculo |
+|---|---|---|
+| Vida útil del artículo | `itemsV2` → `ShelfLifeDays` (con `LotExpirationControlValue`, p. ej. `Item shelf life days`) | tal cual, en días |
+| Vida útil real del lote | `inventoryItemLots` → `ExpirationDate` y `OriginationDate` | `ExpirationDate − OriginationDate` (solo la fecha, en UTC) |
+| Diferencia | — | vida del lote − `ShelfLifeDays` (0 = coincide) |
+| Días restantes | `ExpirationDate` | `ExpirationDate − hoy (UTC)`; negativo = vencido |
+| % restante | — | restantes ÷ `ShelfLifeDays` (si el artículo no lo trae, ÷ vida del lote) |
+
+Filas en rojo = vencidas; en amarillo = menos de 25 % de vida.
+
 Response (**real**):
 
 ```json

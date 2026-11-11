@@ -39,6 +39,7 @@ namespace iFusion.Views
         private int version;
         private string currentItem, currentDescription, currentOrg;
         private JArray stockRows = new JArray();
+        private JToken shelfItem; // datos maestros del artículo mostrado (vida útil para comparar con sus lotes)
         private DataGridView gridStock;
 
         /// <summary>Mensajes de estado para la barra inferior de la ventana principal.</summary>
@@ -318,6 +319,7 @@ namespace iFusion.Views
                 P("Cantidad mínima de orden", item, "MinimumOrderQuantity"), P("Cantidad máxima de orden", item, "MaximumOrderQuantity"), P("Múltiplo de lote fijo", item, "FixedLotSizeMultiplier")
             }, UiKit.Lbl("FIFO consume primero el lote más antiguo por fecha de origen, LIFO el más reciente y FEFO el que caduca antes; los tres órdenes aparecen en la tabla de lotes. La regla de picking del artículo es informativa.", false, 8.5f, Ui.Muted));
 
+            shelfItem = item;
             BuildStock(rows, onhand, lotsInfo);
 
             ThemeManager.ApplyTo(detail);
@@ -488,14 +490,42 @@ namespace iFusion.Views
             List<JToken> byExpiry = lots.OrderBy(l => DateValue(l, "ExpirationDate") ?? DateTime.MaxValue).ThenBy(l => UiKit.S(l, "LotNumber")).ToList();
             foreach (JToken l in byExpiry) fefo[l] = ++n;
 
+            // Vida útil: la del artículo (ShelfLifeDays de itemsV2) contra la real de cada lote (ExpirationDate − OriginationDate de inventoryItemLots)
+            decimal? itemDaysDec = Dec(shelfItem, "ShelfLifeDays");
+            int? itemDays = shelfItem != null && shelfItem["ShelfLifeDays"] != null && shelfItem["ShelfLifeDays"].Type != JTokenType.Null ? (int?)(int)itemDaysDec.Value : null;
+            DateTime today = DateTime.UtcNow.Date;
+            int same = 0, differ = 0, expired = 0, soon = 0;
+
             DataGridView g = UiKit.Grid(false);
             UiKit.Col(g, "FEFO", 0.5f, true); UiKit.Col(g, "FIFO", 0.5f, true); UiKit.Col(g, "LIFO", 0.5f, true); UiKit.Col(g, "Lote", 1.4f); UiKit.Col(g, "Estatus", 0.7f); UiKit.Col(g, "Grado", 0.6f);
-            UiKit.Col(g, "Origen", 0.9f); UiKit.Col(g, "Caducidad", 0.9f); UiKit.Col(g, "Mantener hasta", 0.9f); UiKit.Col(g, "Re-prueba", 0.9f); UiKit.Col(g, "Maduración", 0.9f); UiKit.Col(g, "Activo", 0.6f);
+            UiKit.Col(g, "Origen", 0.9f); UiKit.Col(g, "Caducidad", 0.9f);
+            UiKit.Col(g, "Vida lote (d)", 0.8f, true); UiKit.Col(g, "Vida artículo (d)", 0.9f, true); UiKit.Col(g, "Dif. (d)", 0.6f, true); UiKit.Col(g, "Restan (d)", 0.8f, true); UiKit.Col(g, "% restante", 0.8f, true);
+            UiKit.Col(g, "Mantener hasta", 0.9f); UiKit.Col(g, "Re-prueba", 0.9f); UiKit.Col(g, "Activo", 0.6f);
             foreach (JToken l in byExpiry)
-                g.Rows.Add(fefo[l], fifo[l], lots.Count - fifo[l] + 1, UiKit.S(l, "LotNumber"), V(l, "StatusCode"), V(l, "Grade"), DateU(l, "OriginationDate"), DateU(l, "ExpirationDate"),
-                    DateU(l, "HoldUntilDate"), DateU(l, "RetestDate"), DateU(l, "MaturityDate"), V(l, "ActiveLot"));
+            {
+                DateTime? o = DateValue(l, "OriginationDate"), x = DateValue(l, "ExpirationDate");
+                int? lotDays = o.HasValue && x.HasValue ? (int?)(x.Value.Date - o.Value.Date).Days : null;
+                int? remain = x.HasValue ? (int?)(x.Value.Date - today).Days : null;
+                int? diff = lotDays.HasValue && itemDays.HasValue ? (int?)(lotDays.Value - itemDays.Value) : null;
+                int? basis = itemDays ?? lotDays;
+                int? pct = remain.HasValue && basis.HasValue && basis.Value > 0 ? (int?)Math.Round(remain.Value * 100.0 / basis.Value) : null;
+                if (diff.HasValue) { if (diff.Value == 0) same++; else differ++; }
+                if (remain.HasValue && remain.Value < 0) expired++; else if (pct.HasValue && pct.Value < 25) soon++;
+                int idx = g.Rows.Add(fefo[l], fifo[l], lots.Count - fifo[l] + 1, UiKit.S(l, "LotNumber"), V(l, "StatusCode"), V(l, "Grade"), DateU(l, "OriginationDate"), DateU(l, "ExpirationDate"),
+                    lotDays.HasValue ? lotDays.Value.ToString("#,##0") : "—", itemDays.HasValue ? itemDays.Value.ToString("#,##0") : "—",
+                    diff.HasValue ? (diff.Value > 0 ? "+" : string.Empty) + diff.Value : "—", remain.HasValue ? remain.Value.ToString("#,##0") : "—", pct.HasValue ? pct.Value + " %" : "—",
+                    DateU(l, "HoldUntilDate"), DateU(l, "RetestDate"), V(l, "ActiveLot"));
+                if (remain.HasValue && remain.Value < 0) g.Rows[idx].DefaultCellStyle.BackColor = Ui.RowDanger;       // vencido
+                else if (pct.HasValue && pct.Value < 25) g.Rows[idx].DefaultCellStyle.BackColor = Ui.RowWarning;     // menos de 25 % de vida
+            }
             g.Height = 34 + Math.Min(lots.Count, 12) * 28;
-            AddSection("Lotes del artículo · orden de consumo FEFO / FIFO / LIFO", new[] { new[] { "Lotes", lots.Count.ToString() } }, g);
+            AddSection("Lotes del artículo · orden de consumo FEFO / FIFO / LIFO y vida útil", new[]
+            {
+                new[] { "Lotes", lots.Count.ToString() }, P("Control de caducidad", shelfItem, "LotExpirationControlValue"),
+                new[] { "Vida útil del artículo (ShelfLifeDays)", itemDays.HasValue ? itemDays.Value.ToString("#,##0") + " días" : "—" },
+                new[] { "Lotes con la misma vida", same.ToString() }, new[] { "Lotes con vida distinta", differ.ToString() },
+                new[] { "Vencidos", expired.ToString() }, new[] { "Con menos de 25 % de vida", soon.ToString() }
+            }, g);
         }
 
         private static string Key(string sub, string loc, string lot) { return sub + "|" + loc + "|" + lot; }

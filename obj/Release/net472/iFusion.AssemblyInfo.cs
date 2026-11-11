@@ -14,7 +14,7 @@ using System.Reflection;
 [assembly: System.Reflection.AssemblyCompanyAttribute("Condor")]
 [assembly: System.Reflection.AssemblyConfigurationAttribute("Release")]
 [assembly: System.Reflection.AssemblyFileVersionAttribute("1.0.0.0")]
-[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+921abd61d24af91fecfd26cd22534a71cefb808a")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+e5cb2dd673f2465073dcb4b594caefc5d7e2a907")]
 [assembly: System.Reflection.AssemblyProductAttribute("iFusion")]
 [assembly: System.Reflection.AssemblyTitleAttribute("iFusion")]
 [assembly: System.Reflection.AssemblyVersionAttribute("1.0.0.0")]
